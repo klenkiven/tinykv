@@ -45,10 +45,6 @@ func (s *StandAloneStorage) Stop() error {
 		log.Fatal(err)
 	}
 
-	/* 清理磁盘数据 */
-	if err := s.engines.Destroy(); err != nil {
-		log.Fatal(err)
-	}
 	return nil
 }
 
@@ -97,7 +93,8 @@ func (d *diskReader) Close() {
 // GetCF implements storage.StorageReader.
 func (d *diskReader) GetCF(cf string, key []byte) ([]byte, error) {
 	// 直接读取Badger存储引擎的值
-	return engine_util.GetCFFromTxn(d.txn, cf, key)
+	value, _ := engine_util.GetCFFromTxn(d.txn, cf, key)
+	return value, nil
 }
 
 // IterCF implements storage.StorageReader.

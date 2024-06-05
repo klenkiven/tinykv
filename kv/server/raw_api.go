@@ -14,10 +14,9 @@ import (
 func (server *Server) RawGet(_ context.Context, req *kvrpcpb.RawGetRequest) (*kvrpcpb.RawGetResponse, error) {
 	// Your Code Here (1).
 	reader, err := server.storage.Reader(req.Context)
-	value, err := reader.GetCF(req.Cf, req.Key)
+	value, _ := reader.GetCF(req.Cf, req.Key)
 
 	return &kvrpcpb.RawGetResponse{
-		Error:    err.Error(),
 		Value:    value,
 		NotFound: value == nil,
 	}, err
@@ -28,11 +27,11 @@ func (server *Server) RawPut(_ context.Context, req *kvrpcpb.RawPutRequest) (*kv
 	// Your Code Here (1).
 	// Hint: Consider using Storage.Modify to store data to be modified
 	batch := []storage.Modify{
-		storage.Modify{
-			Data: &storage.Put{
+		{
+			Data: storage.Put{
+				Cf:    req.Cf,
 				Key:   req.Key,
 				Value: req.Value,
-				Cf:    req.Cf,
 			},
 		},
 	}
@@ -41,7 +40,6 @@ func (server *Server) RawPut(_ context.Context, req *kvrpcpb.RawPutRequest) (*kv
 			Error: err.Error(),
 		}, err
 	}
-
 	return nil, nil
 }
 
@@ -50,8 +48,8 @@ func (server *Server) RawDelete(_ context.Context, req *kvrpcpb.RawDeleteRequest
 	// Your Code Here (1).
 	// Hint: Consider using Storage.Modify to store data to be deleted
 	batch := []storage.Modify{
-		storage.Modify{
-			Data: &storage.Delete{
+		{
+			Data: storage.Delete{
 				Key: req.Key,
 				Cf:  req.Cf,
 			},
@@ -74,7 +72,8 @@ func (server *Server) RawScan(_ context.Context, req *kvrpcpb.RawScanRequest) (*
 	iterCf := reader.IterCF(req.Cf)
 
 	entries := []*kvrpcpb.KvPair{}
-	for iterCf.Valid() {
+	iterCf.Seek(req.StartKey)
+	for i := 0; iterCf.Valid() && i < int(req.Limit); i++ {
 		dbItem := iterCf.Item()
 		itemKey := dbItem.Key()
 		itemValue, _ := dbItem.Value()
@@ -82,10 +81,11 @@ func (server *Server) RawScan(_ context.Context, req *kvrpcpb.RawScanRequest) (*
 			Key:   itemKey,
 			Value: itemValue,
 		})
+		iterCf.Next()
 	}
+	iterCf.Close()
 
 	return &kvrpcpb.RawScanResponse{
-		Error: err.Error(),
-		Kvs:   entries,
+		Kvs: entries,
 	}, err
 }
